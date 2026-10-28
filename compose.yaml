@@ -1,0 +1,9 @@
+services:
+  backend:
+    build: .
+    ports:
+      - '5000:5000'
+    volumes:
+      - ./app:/srv/eliddi/app
+      - ./tests:/srv/eliddi/tests
+      - ./data:/srv/eliddi/data
