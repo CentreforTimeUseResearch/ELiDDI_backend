@@ -1,18 +1,17 @@
 FROM rockylinux/rockylinux:10
 
-# Rocky 10's own Python is 3.12, so install the pinned version with uv
-COPY --from=ghcr.io/astral-sh/uv:0.13.6 /uv /usr/local/bin/uv
+# Rocky 10's system Python is 3.12, which is the version the study server runs
+RUN dnf install -y python3 python3-pip && dnf clean all
 
-ENV UV_PYTHON_INSTALL_DIR=/opt/python \
-    VIRTUAL_ENV=/opt/venv \
+ENV VIRTUAL_ENV=/opt/venv \
     PATH=/opt/venv/bin:$PATH \
     FLASK_APP=app
 
-RUN uv venv --python 3.15.1 /opt/venv
+RUN python3 -m venv /opt/venv
 
 WORKDIR /srv/eliddi
 COPY requirements.txt requirements-dev.txt ./
-RUN uv pip install -r requirements-dev.txt
+RUN pip install --no-cache-dir -r requirements-dev.txt
 
 COPY app app
 COPY tests tests

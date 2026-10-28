@@ -1,6 +1,6 @@
 # ELiDDI_backend
 
-Optional server for [ELiDDI](../ELiDDI). Target environment: Rocky Linux 10, Python 3.15.1, Flask, SQLite.
+Optional server for [ELiDDI](../ELiDDI). Target environment: Rocky Linux 10, Python 3.12 (Rocky 10's system Python), Flask, SQLite.
 
 ## Run locally
 
