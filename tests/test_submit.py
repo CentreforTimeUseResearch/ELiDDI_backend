@@ -15,8 +15,15 @@ PAYLOAD = {
 
 
 @pytest.fixture
-def client(tmp_path):
-    app = create_app(data_dir=tmp_path)
+def data_dir(tmp_path):
+    path = tmp_path / 'data'
+    path.mkdir()
+    return path
+
+
+@pytest.fixture
+def client(tmp_path, data_dir):
+    app = create_app(data_dir=data_dir, database=tmp_path / 'eliddi.sqlite3')
     return app.test_client()
 
 
@@ -24,20 +31,20 @@ def test_index(client):
     assert client.get('/').status_code == 200
 
 
-def test_saves_payload_keyed_by_experiment_date_and_timestamp(client, tmp_path):
+def test_saves_payload_keyed_by_experiment_date_and_timestamp(client, data_dir):
     response = client.post('/submit', json=PAYLOAD)
 
     assert response.status_code == 201
-    files = list((tmp_path / 'mumtime').glob('2026-10-28_*.json'))
+    files = list((data_dir / 'mumtime').glob('2026-10-28_*.json'))
     assert [f.name for f in files] == [response.get_json()['saved']]
     assert json.loads(files[0].read_text(encoding='utf-8')) == PAYLOAD
 
 
-def test_two_submissions_do_not_overwrite_each_other(client, tmp_path):
+def test_two_submissions_do_not_overwrite_each_other(client, data_dir):
     client.post('/submit', json=PAYLOAD)
     client.post('/submit', json=PAYLOAD)
 
-    assert len(list((tmp_path / 'mumtime').glob('*.json'))) == 2
+    assert len(list((data_dir / 'mumtime').glob('*.json'))) == 2
 
 
 def test_preflight_is_answered_with_cors_headers(client):
@@ -56,19 +63,19 @@ def test_post_response_has_cors_header(client):
 
 
 @pytest.mark.parametrize('experiment_id', ['../evil', 'a/b', 'a\\b', '', 'x' * 65, 5, None])
-def test_rejects_unsafe_experiment_id(client, tmp_path, experiment_id):
+def test_rejects_unsafe_experiment_id(client, data_dir, experiment_id):
     response = client.post('/submit', json={**PAYLOAD, 'experimentID': experiment_id})
 
     assert response.status_code == 400
-    assert list(tmp_path.iterdir()) == []
+    assert list(data_dir.iterdir()) == []
 
 
 @pytest.mark.parametrize('date', ['2026-13-01', '2026-02-30', '28-10-2026', '../2026-10-28', 20261028, None])
-def test_rejects_invalid_date(client, tmp_path, date):
+def test_rejects_invalid_date(client, data_dir, date):
     response = client.post('/submit', json={**PAYLOAD, 'date': date})
 
     assert response.status_code == 400
-    assert list(tmp_path.iterdir()) == []
+    assert list(data_dir.iterdir()) == []
 
 
 def test_rejects_missing_fields(client):
