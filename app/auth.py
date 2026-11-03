@@ -95,26 +95,35 @@ def unauthorized():
     return response, 401
 
 
-# Protects a route: needs "Authorization: Bearer <token>" with a token that is
-# known and not expired. The route can then read g.respondent_id (and
-# g.token_hash, to end this login).
+# Checks "Authorization: Bearer <token>": a token that is known and not expired.
+# Returns None and sets g.respondent_id and g.token_hash, or returns the 401
+# response to send.
+def authenticate():
+    scheme, _, token = request.headers.get('Authorization', '').partition(' ')
+    if scheme.lower() != 'bearer' or not token.strip():
+        return unauthorized()
+    token_hash = hash_token(token.strip())
+    row = db.get_db().execute(
+        'SELECT respondent_id, expires_at FROM tokens WHERE token_hash = ?', (token_hash,)
+    ).fetchone()
+    if row is None:
+        return unauthorized()
+    if row['expires_at'] <= to_text(utcnow()):
+        db.get_db().execute('DELETE FROM tokens WHERE token_hash = ?', (token_hash,))
+        return unauthorized()
+    g.respondent_id = row['respondent_id']
+    g.token_hash = token_hash
+    return None
+
+
+# Protects a route. The route can then read g.respondent_id (and g.token_hash,
+# to end this login).
 def require_auth(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
-        scheme, _, token = request.headers.get('Authorization', '').partition(' ')
-        if scheme.lower() != 'bearer' or not token.strip():
-            return unauthorized()
-        token_hash = hash_token(token.strip())
-        row = db.get_db().execute(
-            'SELECT respondent_id, expires_at FROM tokens WHERE token_hash = ?', (token_hash,)
-        ).fetchone()
-        if row is None:
-            return unauthorized()
-        if row['expires_at'] <= to_text(utcnow()):
-            db.get_db().execute('DELETE FROM tokens WHERE token_hash = ?', (token_hash,))
-            return unauthorized()
-        g.respondent_id = row['respondent_id']
-        g.token_hash = token_hash
+        failure = authenticate()
+        if failure is not None:
+            return failure
         return view(*args, **kwargs)
 
     return wrapped

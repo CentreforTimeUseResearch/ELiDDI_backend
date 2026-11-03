@@ -15,7 +15,14 @@ Source in `app/` is bind-mounted and Flask runs in debug mode, so edits reload w
 
 ## Receiving a Diary
 
-`POST /submit` takes the JSON payload described in ELiDDI's `docs/adr/0006-diary-submission-payload.md` and saves it as `data/<experimentID>/<date>_<UTC timestamp>.json` (`data/` is gitignored). It answers `201` with the saved filename, or `400` if the body isn't a JSON object or `experimentID` / `date` are missing or unsafe to use in a path. CORS allows any origin.
+`POST /submit` takes the JSON payload described in ELiDDI's `docs/adr/0006-diary-submission-payload.md`. It has two modes:
+
+- **With a login token** (`Authorization: Bearer <token>`): the Diary is stored in the `submissions` table under that Respondent, exactly as received, and the answer is `201` with `{"id": …}`. `status` must be `0` or `100`. A Diary submitted again adds another row. A token that is sent but missing, unknown or expired gets `401`; it is never treated as "no token".
+- **Without a token:** it is saved as `data/<experimentID>/<date>_<UTC timestamp>.json` (`data/` is gitignored) and answers `201` with the saved filename. This is for local testing without accounts, such as MUMTIME.
+
+Set `ELIDDI_REQUIRE_AUTH=1` to refuse requests without a valid token (`401`) and so turn the file mode off. Do this on any server others can reach.
+
+Both modes answer `400` if the body isn't a JSON object or `experimentID` / `date` are missing or unsafe to use in a path. CORS allows any origin.
 
 To use it from ELiDDI, set `general.submit_completed_diary_url` to `http://localhost:5000/submit` in the study config.
 

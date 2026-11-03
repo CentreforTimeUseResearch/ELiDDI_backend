@@ -25,6 +25,8 @@ def create_app(data_dir=None, database=None, dummy_respondents=None):
     app.config['CODE_ALPHABET'] = os.environ.get('ELIDDI_CODE_ALPHABET') or codes.DEFAULT_ALPHABET
     app.config['CODE_HASH_KEY'] = codes.load_hash_key(app.config['DATABASE'].parent, os.environ)
 
+    # when set, /submit refuses a request without a valid login token
+    app.config['REQUIRE_AUTH'] = os.environ.get('ELIDDI_REQUIRE_AUTH', '').lower() in ('1', 'true', 'yes')
     app.config['TOKEN_LIFETIME'] = int(os.environ.get('ELIDDI_TOKEN_LIFETIME') or 12 * 60 * 60)  # seconds
     app.config['LOGIN_MAX_FAILURES'] = int(os.environ.get('ELIDDI_LOGIN_MAX_FAILURES') or 10)
     app.config['LOGIN_WINDOW'] = int(os.environ.get('ELIDDI_LOGIN_WINDOW') or 15 * 60)  # seconds
