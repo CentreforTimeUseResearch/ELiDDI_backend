@@ -40,6 +40,20 @@ To change the schema, add the next numbered file. Never edit one that has been r
 
 Code gets a connection with `app.db.get_db()` (one per request, closed automatically). Connections are in autocommit mode: wrap writes in `with db.transaction(conn):`.
 
+## Login codes (test phase)
+
+A Respondent logs in with a **login code**. Lausanne has not decided how real codes are issued (probably by email), so for now the server makes dummy ones.
+
+- **Format:** 8 characters from `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (no `0/O`, `1/I/L`), drawn with Python's `secrets` module and shown as `ABCD-EFGH`. Entry ignores case, spaces and hyphens. About 8.5 × 10^11 possible codes. Set `ELIDDI_CODE_LENGTH` and `ELIDDI_CODE_ALPHABET` to change them.
+- **Stored hashed:** only an HMAC-SHA256 of the code goes in the database, keyed with `ELIDDI_CODE_HASH_KEY` (or, if that is not set, a random key created in `code_hash_key` next to the database). Keep the key: without it every stored code stops working.
+- **Dummy Respondents:** with `ELIDDI_DUMMY_RESPONDENTS=6` (set in `compose.yaml`) the server makes that many Respondents at start-up and logs their codes, standing in for the email the full system will send. It is off by default and **must stay off in production**.
+
+```bash
+docker compose logs backend      # find the "TEST PHASE login codes" block
+```
+
+The codes are kept in `dummy_codes.json` next to the database, so a restart logs the same codes and makes no new Respondents. Asking for more adds only the missing ones. To start over, delete the database and `dummy_codes.json`. That file holds the codes in plain text, which is why it is for development only.
+
 ## Tests
 
 ```bash

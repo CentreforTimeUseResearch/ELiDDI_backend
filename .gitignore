@@ -5,3 +5,5 @@ __pycache__/
 .pytest_cache/
 *.sqlite3
 *.sqlite3-journal
+code_hash_key
+dummy_codes.json
