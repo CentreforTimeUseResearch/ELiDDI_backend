@@ -54,6 +54,35 @@ docker compose logs backend      # find the "TEST PHASE login codes" block
 
 The codes are kept in `dummy_codes.json` next to the database, so a restart logs the same codes and makes no new Respondents. Asking for more adds only the missing ones. To start over, delete the database and `dummy_codes.json`. That file holds the codes in plain text, which is why it is for development only.
 
+## Login
+
+`POST /login` with `{"code": "ABCD-EFGH"}` returns
+
+```json
+{ "token": "…", "respondentId": "c844a447-…", "expiresAt": "2026-11-04T02:46:38Z" }
+```
+
+Send the token on later requests as `Authorization: Bearer <token>`. The `respondentId` is a random, non-secret id the page uses to key its local copy of the diary; it is not a credential.
+
+| Status | When                                                                                         |
+| ------ | -------------------------------------------------------------------------------------------- |
+| 200    | the code is known                                                                            |
+| 400    | the body is not a JSON object with a string `code`                                           |
+| 401    | the code is not known. Every kind of wrong code (bad length, unknown, empty) answers the same |
+| 429    | too many failed attempts from this address. `Retry-After` says how many seconds to wait      |
+
+`POST /logout` (needs the token) ends that one login; the Respondent's other devices stay logged in. A missing, unknown or expired token gets `401` with `WWW-Authenticate: Bearer`.
+
+Protect a route with `@require_auth` from `app/auth.py`; the view can then read `g.respondent_id`.
+
+**Tokens** are random (`secrets.token_urlsafe`) and only their SHA-256 is stored, so a copy of the database can't be used to act as a Respondent. They expire after `ELIDDI_TOKEN_LIFETIME` seconds (default 12 hours; households share devices, so keep it short).
+
+**Rate limiting.** After `ELIDDI_LOGIN_MAX_FAILURES` failed attempts (default 10) within `ELIDDI_LOGIN_WINDOW` seconds (default 900), that client address gets `429`, even with a correct code, until old failures age out. Failures are kept in the database, so the limit holds across several workers. It is per address: there is deliberately no overall lockout, because anyone could trigger one to stop every Respondent logging in.
+
+**Behind a reverse proxy**, every request comes from the proxy's address, which would put all Respondents in one bucket. Set `ELIDDI_PROXY_HOPS` to the number of proxies in front of the app so the client address is read from `X-Forwarded-For`. Leave it at 0 otherwise: the header is just whatever the client sends.
+
+CORS allows the `Authorization` header and exposes `Retry-After` to the page.
+
 ## Tests
 
 ```bash

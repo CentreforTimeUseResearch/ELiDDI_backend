@@ -52,7 +52,7 @@ def test_preflight_is_answered_with_cors_headers(client):
 
     assert response.status_code == 204
     assert response.headers['Access-Control-Allow-Origin'] == '*'
-    assert response.headers['Access-Control-Allow-Headers'] == 'Content-Type'
+    assert response.headers['Access-Control-Allow-Headers'] == 'Content-Type, Authorization'
     assert 'POST' in response.headers['Access-Control-Allow-Methods']
 
 
