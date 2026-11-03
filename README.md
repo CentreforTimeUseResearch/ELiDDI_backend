@@ -90,6 +90,28 @@ Protect a route with `@require_auth` from `app/auth.py`; the view can then read 
 
 CORS allows the `Authorization` header and exposes `Retry-After` to the page.
 
+## Respondent state
+
+`GET /state` and `PUT /state` (both need the login token) keep a Respondent's in-progress state, so they can carry on from another device. The rules are ELiDDI's `docs/adr/0007-server-sync-model.md`. The server stores the state as one JSON snapshot per Respondent and does not read what is in it. The Respondent always comes from the token, so nobody can reach another Respondent's state.
+
+```
+GET /state   -> 200 { revision, stateVersion, state }      404 if nothing has been saved yet
+PUT /state   <- { baseRevision, stateVersion, state }
+             -> 200 { revision }                           accepted; the revision went up by one
+             -> 409 { revision, stateVersion, state }      baseRevision was not the current revision
+```
+
+`baseRevision` is the revision the browser last saw (0 if it has seen none). A write built on anything else is refused with `409` and the current snapshot, so the browser can reconcile and try again; this is how two devices avoid overwriting each other. If nothing is stored yet, the `409` is just `{ "revision": 0 }`.
+
+| Status | When                                                                                  |
+| ------ | ------------------------------------------------------------------------------------- |
+| 400    | the body is not a JSON object                                                         |
+| 401    | missing, unknown or expired token                                                     |
+| 413    | the body is over `ELIDDI_STATE_MAX_BYTES` (default 1,000,000)                         |
+| 422    | `baseRevision` is not a whole number ≥ 0, `stateVersion` not a whole number ≥ 1, or `state` not an object |
+
+`stateVersion` is stored with the snapshot and handed back unchanged; the browser uses it to tell whether it understands what it was given.
+
 ## Tests
 
 ```bash
