@@ -24,9 +24,9 @@ def write_migration(directory, name, sql):
 def test_migrate_creates_the_schema_and_records_it(conn):
     applied = db.migrate(conn)
 
-    assert applied == [1, 2]
+    assert applied == [1, 2, 3]
     assert {'respondents', 'diary_states', 'submissions', 'tokens', 'login_failures', 'schema_migrations'} <= tables(conn)
-    assert [row['version'] for row in conn.execute('SELECT version FROM schema_migrations')] == [1, 2]
+    assert [row['version'] for row in conn.execute('SELECT version FROM schema_migrations')] == [1, 2, 3]
 
 
 def test_migrate_twice_applies_nothing_the_second_time(conn):

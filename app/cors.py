@@ -6,7 +6,7 @@ def add_cors(app):
     def set_headers(response):
         response.headers['Access-Control-Allow-Origin'] = '*'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, OPTIONS'
         # lets the page read how long to wait after a 429
         response.headers['Access-Control-Expose-Headers'] = 'Retry-After'
         return response

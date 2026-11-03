@@ -7,6 +7,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from . import codes, db, respondents
 from .auth import auth as auth_blueprint
 from .cors import add_cors
+from .state import state as state_blueprint
 from .submissions import submissions
 
 
@@ -25,6 +26,7 @@ def create_app(data_dir=None, database=None, dummy_respondents=None):
     app.config['CODE_ALPHABET'] = os.environ.get('ELIDDI_CODE_ALPHABET') or codes.DEFAULT_ALPHABET
     app.config['CODE_HASH_KEY'] = codes.load_hash_key(app.config['DATABASE'].parent, os.environ)
 
+    app.config['STATE_MAX_BYTES'] = int(os.environ.get('ELIDDI_STATE_MAX_BYTES') or 1_000_000)
     # when set, /submit refuses a request without a valid login token
     app.config['REQUIRE_AUTH'] = os.environ.get('ELIDDI_REQUIRE_AUTH', '').lower() in ('1', 'true', 'yes')
     app.config['TOKEN_LIFETIME'] = int(os.environ.get('ELIDDI_TOKEN_LIFETIME') or 12 * 60 * 60)  # seconds
@@ -52,6 +54,7 @@ def create_app(data_dir=None, database=None, dummy_respondents=None):
 
     app.register_blueprint(submissions)
     app.register_blueprint(auth_blueprint)
+    app.register_blueprint(state_blueprint)
     add_cors(app)
 
     return app
