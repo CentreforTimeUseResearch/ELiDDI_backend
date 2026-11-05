@@ -24,7 +24,11 @@ Set `ELIDDI_REQUIRE_AUTH=1` to refuse requests without a valid token (`401`) and
 
 Both modes answer `400` if the body isn't a JSON object or `experimentID` / `date` are missing or unsafe to use in a path. CORS allows any origin.
 
-To use it from ELiDDI, set `general.submit_completed_diary_url` to `http://localhost:5000/submit` in the study config.
+To use it from ELiDDI **without accounts**, set `general.submit_completed_diary_url` to `http://localhost:5000/submit` in the study config. **With accounts** (`general.server_accounts: true` and `general.backend_url: http://localhost:5000`) ELiDDI sends the Diary to `<backend_url>/submit` with the login token and ignores `submit_completed_diary_url`.
+
+## Testing with the page
+
+ELiDDI has a manual, two-device test script for the whole of login, sync and submission against this backend: [`docs/server-accounts-test.md`](../ELiDDI/docs/server-accounts-test.md) in the ELiDDI repository. The design the backend serves is ELiDDI's [`docs/adr/0007-server-sync-model.md`](../ELiDDI/docs/adr/0007-server-sync-model.md).
 
 ## Database
 
