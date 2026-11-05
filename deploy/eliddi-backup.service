@@ -1,0 +1,9 @@
+[Unit]
+Description=Back up the ELiDDI backend database
+
+[Service]
+Type=oneshot
+User=eliddi
+Group=eliddi
+EnvironmentFile=/etc/eliddi-backend.env
+ExecStart=/opt/eliddi-backend/deploy/backup.sh

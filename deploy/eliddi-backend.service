@@ -1,0 +1,34 @@
+[Unit]
+Description=ELiDDI backend (login, diary sync and submission for time-use studies)
+After=network.target
+Documentation=https://github.com/CentreforTimeUseResearch/ELiDDI_backend
+
+[Service]
+User=eliddi
+Group=eliddi
+# Relative paths inside the app (file-mode submissions) resolve here. The database
+# itself is set by ELIDDI_DATABASE in the environment file.
+WorkingDirectory=/var/lib/eliddi
+EnvironmentFile=/etc/eliddi-backend.env
+# Listens on this machine only; nginx is the one reachable from outside.
+# 3 workers is plenty for a few thousand Respondents; SQLite serialises writes anyway.
+ExecStart=/opt/eliddi-backend/venv/bin/gunicorn \
+    --pythonpath /opt/eliddi-backend \
+    --bind 127.0.0.1:8000 \
+    --workers 3 \
+    --timeout 30 \
+    --access-logfile - \
+    --error-logfile - \
+    'app:create_app()'
+Restart=on-failure
+RestartSec=3
+
+# Run with as little access as the service needs
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/eliddi
+
+[Install]
+WantedBy=multi-user.target

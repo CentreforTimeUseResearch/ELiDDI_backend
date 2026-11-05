@@ -93,7 +93,8 @@ def test_codes_are_logged_once_in_groups_of_four(paths, caplog):
     with caplog.at_level(logging.WARNING):
         app = create_app(**paths, dummy_respondents=3)
 
-    assert len(caplog.records) == 1
+    # (the start-up check adds its own, separate warnings about unsafe settings)
+    assert len([r for r in caplog.records if 'TEST PHASE' in r.getMessage()]) == 1
     for code in stored_codes(app):
         assert codes.format_code(code) in caplog.text
 

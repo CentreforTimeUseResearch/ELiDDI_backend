@@ -9,3 +9,5 @@ import pytest
 def clean_environment(monkeypatch):
     for name in [name for name in os.environ if name.startswith('ELIDDI_')]:
         monkeypatch.delenv(name)
+    # most tests run as a page from anywhere would; test_cors.py sets its own
+    monkeypatch.setenv('ELIDDI_CORS_ORIGINS', '*')

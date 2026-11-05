@@ -1,0 +1,14 @@
+#!/bin/bash
+# Runs a backend command (see "flask --help") as the service would: same
+# settings (/etc/eliddi-backend.env), same database. Run it as the eliddi user:
+#
+#   sudo -u eliddi /opt/eliddi-backend/deploy/eliddi-admin create-respondents 50
+set -euo pipefail
+
+set -a
+. "${ELIDDI_ENV_FILE:-/etc/eliddi-backend.env}"
+set +a
+
+export PYTHONPATH=/opt/eliddi-backend
+cd /var/lib/eliddi
+exec /opt/eliddi-backend/venv/bin/flask --app app "$@"
