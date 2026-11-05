@@ -6,6 +6,8 @@ services:
     environment:
       # test phase: make 6 dummy Respondents and log their login codes at start-up
       ELIDDI_DUMMY_RESPONDENTS: '6'
+      # local testing only: any page may call the backend. A real server lists origins.
+      ELIDDI_CORS_ORIGINS: '*'
     volumes:
       - ./app:/srv/eliddi/app
       - ./tests:/srv/eliddi/tests

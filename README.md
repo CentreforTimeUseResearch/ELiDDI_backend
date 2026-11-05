@@ -2,6 +2,8 @@
 
 Optional server for [ELiDDI](../ELiDDI). Target environment: Rocky Linux 10, Python 3.12 (Rocky 10's system Python), Flask, SQLite.
 
+**Running it for real?** Follow [docs/production.md](docs/production.md) (install, settings, HTTPS, backups, upgrades, checklist). The Docker set-up below is for development and testing only.
+
 ## Run locally
 
 Needs Docker running.
@@ -22,7 +24,7 @@ Source in `app/` is bind-mounted and Flask runs in debug mode, so edits reload w
 
 Set `ELIDDI_REQUIRE_AUTH=1` to refuse requests without a valid token (`401`) and so turn the file mode off. Do this on any server others can reach.
 
-Both modes answer `400` if the body isn't a JSON object or `experimentID` / `date` are missing or unsafe to use in a path. CORS allows any origin.
+Both modes answer `400` if the body isn't a JSON object or `experimentID` / `date` are missing or unsafe to use in a path. CORS is limited to the origins in `ELIDDI_CORS_ORIGINS` (see [CORS](#cors)).
 
 To use it from ELiDDI **without accounts**, set `general.submit_completed_diary_url` to `http://localhost:5000/submit` in the study config. **With accounts** (`general.server_accounts: true` and `general.backend_url: http://localhost:5000`) ELiDDI sends the Diary to `<backend_url>/submit` with the login token and ignores `submit_completed_diary_url`.
 
@@ -92,7 +94,19 @@ Protect a route with `@require_auth` from `app/auth.py`; the view can then read 
 
 **Behind a reverse proxy**, every request comes from the proxy's address, which would put all Respondents in one bucket. Set `ELIDDI_PROXY_HOPS` to the number of proxies in front of the app so the client address is read from `X-Forwarded-For`. Leave it at 0 otherwise: the header is just whatever the client sends.
 
-CORS allows the `Authorization` header and exposes `Retry-After` to the page.
+See [CORS](#cors) for which pages may call the backend.
+
+## CORS
+
+The page that calls the backend is served from a different origin, so the browser only lets it through if the backend says so. Set `ELIDDI_CORS_ORIGINS` to a comma-separated list of origins (scheme and host, no path), for example `https://stratus.github.io,https://survey.unil.ch`. A request from a listed origin is answered with that origin in `Access-Control-Allow-Origin` (and `Vary: Origin`); any other origin gets no CORS headers and the browser refuses it. The `Authorization` header is allowed and `Retry-After` is exposed to the page. `*` allows every origin: `compose.yaml` sets it for local testing, and the start-up log warns if it is used elsewhere. **Unset means no page may call the backend** (the right choice only when the page and the backend share an origin).
+
+## Issuing login codes
+
+```bash
+flask --app app create-respondents 50 > codes.txt     # in Docker: docker compose run --rm backend flask --app app create-respondents 50
+```
+
+Makes that many Respondents and prints their codes once, one per line. Only a hash is stored, so a lost list cannot be recovered. This is the stopgap until it is decided how codes reach Respondents (probably email). On a production server use `deploy/eliddi-admin` instead (see [docs/production.md](docs/production.md)).
 
 ## Respondent state
 
