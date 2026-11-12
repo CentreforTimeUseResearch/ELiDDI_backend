@@ -28,6 +28,15 @@ Both modes answer `400` if the body isn't a JSON object or `experimentID` / `dat
 
 To use it from ELiDDI **without accounts**, set `general.submit_completed_diary_url` to `http://localhost:5000/submit` in the study config. **With accounts** (`general.server_accounts: true` and `general.backend_url: http://localhost:5000`) ELiDDI sends the Diary to `<backend_url>/submit` with the login token and ignores `submit_completed_diary_url`.
 
+## Exporting Diaries for a researcher
+
+Every Diary sent with a login can be exported as one JSON file, two ways:
+
+- **Command** (on the server, where the database is): `flask --app app export-submissions [--experiment ID] [--output FILE]`. On a production server use `deploy/eliddi-admin export-submissions`.
+- **`GET /admin/export[?experimentID=…]`** is a **temporary** route for a researcher who cannot reach the server. It exists only when `ELIDDI_EXPORT_PASSWORD` is set, and then asks for that password with HTTP Basic auth (any username), so a browser shows its own password box and saves `eliddi-export-<date>.json`. A wrong password gets `401` (and counts towards the login rate limit, then `429`); unset, the route answers `404`. It is a stopgap for one researcher in a small test, not an admin system: one shared password, no audit trail, no paging. Serve it over HTTPS only.
+
+The file lists every submission with its opaque `respondentId`, `experimentID`, `date`, `status`, `submittedAt` and the `payload` exactly as received, plus `latest` (true on the most recent submission for that Respondent, experiment and date: filter on it for one Diary per day, because a Diary submitted in progress and again as complete has two rows). Submissions saved as files without a login (`data/<experimentID>/…`) are not included. Details: [docs/production.md](docs/production.md#exporting-the-data).
+
 ## Testing with the page
 
 ELiDDI has a manual, two-device test script for the whole of login, sync and submission against this backend: [`docs/server-accounts-test.md`](../ELiDDI/docs/server-accounts-test.md) in the ELiDDI repository. The design the backend serves is ELiDDI's [`docs/adr/0007-server-sync-model.md`](../ELiDDI/docs/adr/0007-server-sync-model.md).
