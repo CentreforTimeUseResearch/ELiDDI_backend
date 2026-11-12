@@ -71,6 +71,7 @@ Edit the file: paste the key as `ELIDDI_CODE_HASH_KEY`, and set `ELIDDI_CORS_ORI
 | `ELIDDI_CORS_ORIGINS`         | none (no page may call it)    | **Set it.** Comma-separated origins of the study pages. `*` allows every page: for testing only.                                                       |
 | `ELIDDI_PROXY_HOPS`           | `0`                           | **Set to `1`** behind nginx, so the login rate limit sees each Respondent's own address. Leave `0` when nothing is in front (the header is then forgeable). |
 | `ELIDDI_CODE_HASH_KEY`        | a random key kept in `code_hash_key` next to the database | The key login codes are hashed with. Set it explicitly so it is in your records, and back it up.                                  |
+| `ELIDDI_EXPORT_PASSWORD`      | unset (no route)              | Turns on the **temporary** researcher download at `/admin/export`. See [Giving a researcher the data](#giving-a-researcher-the-data). Use at least 16 random characters.                |
 | `ELIDDI_DUMMY_RESPONDENTS`    | `0`                           | Test-phase login codes, written to the log and to `dummy_codes.json`. **Must not be set in production.**                                              |
 | `ELIDDI_TOKEN_LIFETIME`       | `43200` (12 hours)            | How long a login lasts, in seconds. Households share devices, so keep it short.                                                                       |
 | `ELIDDI_LOGIN_MAX_FAILURES`   | `10`                          | Wrong codes allowed from one address within `ELIDDI_LOGIN_WINDOW`, after which it gets `429` until they age out.                                       |
@@ -156,7 +157,45 @@ print('submitted diaries:', c.execute('select count(*) from submissions').fetcho
 print('saved in-progress diaries:', c.execute('select count(*) from diary_states').fetchone()[0])"
 ```
 
-Submitted Diaries are in the `submissions` table, each as the JSON the page sent (`payload`) with the Respondent, experiment, date and time beside it. There is no export tool yet.
+Submitted Diaries are in the `submissions` table, each as the JSON the page sent (`payload`) with the Respondent, experiment, date and time beside it.
+
+### Exporting the data
+
+On the server, as the service user:
+
+```bash
+sudo -u eliddi /opt/eliddi-backend/deploy/eliddi-admin export-submissions > export.json
+sudo -u eliddi /opt/eliddi-backend/deploy/eliddi-admin export-submissions --experiment stratus --output export.json
+```
+
+The file has `exportedAt`, `count` and a `submissions` list in the order they arrived. Each entry is `id`, `respondentId` (an opaque id, never a login code), `experimentID`, `date`, `status` (`0` in progress, `100` complete), `submittedAt`, `latest` and the `payload` exactly as the page sent it ([ADR 0006](https://github.com/CentreforTimeUseResearch/ELiDDI/blob/main/docs/adr/0006-diary-submission-payload.md)).
+
+A Diary can be submitted more than once (the first goes out in progress, the finished day again as complete), so each row says whether it is the `latest` one for that Respondent, experiment and date. **Keep only the rows where `latest` is true to get one Diary per day.**
+
+### Giving a researcher the data
+
+A researcher with no access to the server can download the same file from the running service. **This is a temporary stopgap for one researcher in a small test**, until there is a real admin system: one shared password, no per-person login, no audit trail, and the whole export is built in memory.
+
+1. Make a password and put it in `/etc/eliddi-backend.env`:
+
+   ```bash
+   python3 -c "import secrets; print(secrets.token_urlsafe(24))"
+   sudo nano /etc/eliddi-backend.env        # ELIDDI_EXPORT_PASSWORD=<the string>
+   sudo systemctl restart eliddi-backend
+   ```
+
+2. Send the researcher the password (not in the same message as the address), and this address:
+
+   ```
+   https://<your server>/admin/export                       every study on this server
+   https://<your server>/admin/export?experimentID=stratus  one study
+   ```
+
+   Their browser asks for a username and password: any username, and the password above. The file `eliddi-export-<date>.json` is then saved. From a terminal: `curl -u researcher:<password> -OJ "https://<your server>/admin/export"`.
+
+3. When they are done, **remove the line from the settings file and restart** (the route then answers `404`), or change the password to cut off the old one.
+
+Safeguards: it is only reachable over HTTPS (nginx redirects port 80); the password is compared in constant time; wrong passwords share the per-address limit of login codes (`ELIDDI_LOGIN_MAX_FAILURES` / `ELIDDI_LOGIN_WINDOW`) and then get `429`; the response is sent with `Cache-Control: no-store`. The service logs a warning at start-up if the password is shorter than 16 characters. Check the nginx access log does not record request headers (the example config does not); the password travels in the `Authorization` header, never in the URL.
 
 ## 9. Backups and restore
 
@@ -199,6 +238,7 @@ Before the first real Respondent logs in, check each of these:
 - [ ] `ELIDDI_PROXY_HOPS=1` and nginx **sets** `X-Forwarded-For` as in `deploy/nginx-eliddi.conf`.
 - [ ] Served over HTTPS only; port 8000 is not reachable from outside (`ss -ltn` shows it on `127.0.0.1`).
 - [ ] The code hash key is in your records, and `/var/backups/eliddi` is copied off the server.
+- [ ] `ELIDDI_EXPORT_PASSWORD` is unset unless a researcher is using the export right now, and is 16+ random characters when it is set.
 - [ ] `journalctl -u eliddi-backend` shows no "Unsafe for production" lines.
 - [ ] The three `curl` checks in section 6 give the answers shown.
 - [ ] You have logged in with a real code from the real study page and the diary survived a reload.
@@ -206,7 +246,7 @@ Before the first real Respondent logs in, check each of these:
 ## What is not decided or built yet
 
 - **How real login codes are issued.** `create-respondents` is the stopgap. Lost-code handling (a Respondent who loses their code) is part of the same open question ([ELiDDI_backend#2](https://github.com/CentreforTimeUseResearch/ELiDDI_backend/issues/2)).
-- **Researcher export** of submitted Diaries ([ELiDDI_backend#9](https://github.com/CentreforTimeUseResearch/ELiDDI_backend/issues/9)).
+- **A real admin system for researchers** (per-person logins, an audit trail, paging, a view as well as a download). The export above is a command plus a temporary shared-password route ([ELiDDI_backend#9](https://github.com/CentreforTimeUseResearch/ELiDDI_backend/issues/9)); whether an admin view is wanted is still to be confirmed with Lausanne.
 - **Data retention and deletion** are your centre's and the study's decisions. The data is in one SQLite file, so a Respondent's rows can be found by their id.
 - **Login lifetime** is the 12-hour proposal in [ELiDDI's ADR 0007](https://github.com/CentreforTimeUseResearch/ELiDDI/blob/main/docs/adr/0007-server-sync-model.md); confirm it for the study.
 

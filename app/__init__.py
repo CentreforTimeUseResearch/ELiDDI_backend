@@ -8,6 +8,8 @@ from . import codes, db, respondents
 from .auth import auth as auth_blueprint
 from .cli import create_respondents_command
 from .cors import add_cors, parse_origins
+from .export import export as export_blueprint
+from .export import export_submissions_command
 from .state import state as state_blueprint
 from .submissions import submissions
 
@@ -35,6 +37,9 @@ def create_app(data_dir=None, database=None, dummy_respondents=None, cors_origin
     app.config['CORS_ORIGINS'] = parse_origins(cors_origins)
     # when set, /submit refuses a request without a valid login token
     app.config['REQUIRE_AUTH'] = os.environ.get('ELIDDI_REQUIRE_AUTH', '').lower() in ('1', 'true', 'yes')
+    # the shared password for the temporary GET /admin/export (see export.py).
+    # Unset or empty: the route does not exist.
+    app.config['EXPORT_PASSWORD'] = os.environ.get('ELIDDI_EXPORT_PASSWORD') or None
     app.config['TOKEN_LIFETIME'] = int(os.environ.get('ELIDDI_TOKEN_LIFETIME') or 12 * 60 * 60)  # seconds
     app.config['LOGIN_MAX_FAILURES'] = int(os.environ.get('ELIDDI_LOGIN_MAX_FAILURES') or 10)
     app.config['LOGIN_WINDOW'] = int(os.environ.get('ELIDDI_LOGIN_WINDOW') or 15 * 60)  # seconds
@@ -62,8 +67,10 @@ def create_app(data_dir=None, database=None, dummy_respondents=None, cors_origin
     app.register_blueprint(submissions)
     app.register_blueprint(auth_blueprint)
     app.register_blueprint(state_blueprint)
+    app.register_blueprint(export_blueprint)
     add_cors(app)
     app.cli.add_command(create_respondents_command)
+    app.cli.add_command(export_submissions_command)
 
     return app
 
@@ -88,6 +95,12 @@ def warn_about_unsafe_settings(app, dummy_respondents):
     if '*' in app.config['CORS_ORIGINS']:
         problems.append(
             'ELIDDI_CORS_ORIGINS allows every origin (*). List the study page origins instead.'
+        )
+    export_password = app.config['EXPORT_PASSWORD']
+    if export_password and len(export_password) < 16:
+        problems.append(
+            'ELIDDI_EXPORT_PASSWORD is shorter than 16 characters: it is the only thing between '
+            'the internet and every submitted Diary. Use a long random string.'
         )
     for problem in problems:
         app.logger.warning('Unsafe for production: %s', problem)
