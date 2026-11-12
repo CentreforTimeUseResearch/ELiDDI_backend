@@ -147,3 +147,33 @@ def test_create_respondents_refuses_a_count_that_is_not_positive(paths):
     app = create_app(**paths, cors_origins='*')
 
     assert app.test_cli_runner().invoke(args=['create-respondents', '0']).exit_code != 0
+
+
+# ---- numbers in the environment
+
+@pytest.mark.parametrize('name', [
+    'ELIDDI_DUMMY_RESPONDENTS', 'ELIDDI_TOKEN_LIFETIME', 'ELIDDI_LOGIN_MAX_FAILURES',
+    'ELIDDI_LOGIN_WINDOW', 'ELIDDI_STATE_MAX_BYTES', 'ELIDDI_CODE_LENGTH', 'ELIDDI_PROXY_HOPS',
+])
+def test_a_number_with_a_trailing_comment_names_the_setting_and_the_cause(paths, monkeypatch, name):
+    # systemd's EnvironmentFile keeps the comment as part of the value
+    monkeypatch.setenv(name, '5   #test-phase note')
+
+    with pytest.raises(ValueError) as error:
+        create_app(**paths)
+
+    message = str(error.value)
+    assert name in message and '5   #test-phase note' in message
+    assert 'comments on their own line' in message
+
+
+def test_an_empty_number_uses_the_default(paths, monkeypatch):
+    monkeypatch.setenv('ELIDDI_LOGIN_WINDOW', '')
+
+    assert create_app(**paths).config['LOGIN_WINDOW'] == 15 * 60
+
+
+def test_a_plain_number_is_read(paths, monkeypatch):
+    monkeypatch.setenv('ELIDDI_LOGIN_WINDOW', '120')
+
+    assert create_app(**paths).config['LOGIN_WINDOW'] == 120
