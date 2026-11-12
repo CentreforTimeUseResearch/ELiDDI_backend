@@ -14,6 +14,23 @@ from .state import state as state_blueprint
 from .submissions import submissions
 
 
+# A whole-number setting from the environment, or `default` when unset or empty.
+# systemd's EnvironmentFile does not strip a trailing comment, so
+# `ELIDDI_X=5   # note` arrives as the text "5   # note": say so, naming the
+# variable, instead of leaving the operator with a bare int() error.
+def env_int(name, default):
+    value = os.environ.get(name)
+    if not value:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        raise ValueError(
+            f'{name} must be a whole number but is {value!r}. In /etc/eliddi-backend.env '
+            'put comments on their own line, never after a value.'
+        ) from None
+
+
 # data_dir: where file-mode submissions are saved. database: the SQLite file,
 # defaulting to $ELIDDI_DATABASE, then eliddi.sqlite3 inside data_dir. The
 # code hash key and dummy codes are kept in the same folder as the database.
@@ -27,11 +44,11 @@ def create_app(data_dir=None, database=None, dummy_respondents=None, cors_origin
     app.config['DATABASE'] = Path(
         database or os.environ.get('ELIDDI_DATABASE') or app.config['DATA_DIR'] / 'eliddi.sqlite3'
     )
-    app.config['CODE_LENGTH'] = int(os.environ.get('ELIDDI_CODE_LENGTH') or codes.DEFAULT_LENGTH)
+    app.config['CODE_LENGTH'] = env_int('ELIDDI_CODE_LENGTH', codes.DEFAULT_LENGTH)
     app.config['CODE_ALPHABET'] = os.environ.get('ELIDDI_CODE_ALPHABET') or codes.DEFAULT_ALPHABET
     app.config['CODE_HASH_KEY'] = codes.load_hash_key(app.config['DATABASE'].parent, os.environ)
 
-    app.config['STATE_MAX_BYTES'] = int(os.environ.get('ELIDDI_STATE_MAX_BYTES') or 1_000_000)
+    app.config['STATE_MAX_BYTES'] = env_int('ELIDDI_STATE_MAX_BYTES', 1_000_000)
     if cors_origins is None:
         cors_origins = os.environ.get('ELIDDI_CORS_ORIGINS')
     app.config['CORS_ORIGINS'] = parse_origins(cors_origins)
@@ -40,22 +57,22 @@ def create_app(data_dir=None, database=None, dummy_respondents=None, cors_origin
     # the shared password for the temporary GET /admin/export (see export.py).
     # Unset or empty: the route does not exist.
     app.config['EXPORT_PASSWORD'] = os.environ.get('ELIDDI_EXPORT_PASSWORD') or None
-    app.config['TOKEN_LIFETIME'] = int(os.environ.get('ELIDDI_TOKEN_LIFETIME') or 12 * 60 * 60)  # seconds
-    app.config['LOGIN_MAX_FAILURES'] = int(os.environ.get('ELIDDI_LOGIN_MAX_FAILURES') or 10)
-    app.config['LOGIN_WINDOW'] = int(os.environ.get('ELIDDI_LOGIN_WINDOW') or 15 * 60)  # seconds
+    app.config['TOKEN_LIFETIME'] = env_int('ELIDDI_TOKEN_LIFETIME', 12 * 60 * 60)  # seconds
+    app.config['LOGIN_MAX_FAILURES'] = env_int('ELIDDI_LOGIN_MAX_FAILURES', 10)
+    app.config['LOGIN_WINDOW'] = env_int('ELIDDI_LOGIN_WINDOW', 15 * 60)  # seconds
 
     # Behind a reverse proxy every request comes from the proxy's address, which
     # would put all Respondents in one rate-limit bucket. Set this to the number
     # of proxies in front of the app (and only then: the header is otherwise
     # whatever the client says).
-    proxy_hops = int(os.environ.get('ELIDDI_PROXY_HOPS') or 0)
+    proxy_hops = env_int('ELIDDI_PROXY_HOPS', 0)
     if proxy_hops:
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=proxy_hops)
 
     db.init_app(app)
 
     if dummy_respondents is None:
-        dummy_respondents = int(os.environ.get('ELIDDI_DUMMY_RESPONDENTS') or 0)
+        dummy_respondents = env_int('ELIDDI_DUMMY_RESPONDENTS', 0)
     if dummy_respondents:
         provide_dummy_respondents(app, dummy_respondents)
     warn_about_unsafe_settings(app, dummy_respondents)

@@ -60,7 +60,7 @@ python3 -c "import secrets; print(secrets.token_hex(32))"     # make a code hash
 sudo nano /etc/eliddi-backend.env
 ```
 
-Edit the file: paste the key as `ELIDDI_CODE_HASH_KEY`, and set `ELIDDI_CORS_ORIGINS` to the study page origin(s), separated by commas. Leave the rest as it is for now. **Keep a copy of the code hash key somewhere safe**: login codes are stored only as a hash made with it, so without it every code stops working.
+Edit the file: paste the key as `ELIDDI_CODE_HASH_KEY`, and set `ELIDDI_CORS_ORIGINS` to the study page origin(s), separated by commas. Leave the rest as it is for now. One `NAME=value` per line: **never put a comment after a value** (`ELIDDI_X=5  # note`), because systemd reads it as part of the value and the service refuses to start. Put comments on their own line. **Keep a copy of the code hash key somewhere safe**: login codes are stored only as a hash made with it, so without it every code stops working.
 
 ### All the settings
 
